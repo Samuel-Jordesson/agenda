@@ -73,13 +73,13 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
 
-        // Lista de modelos para tentar em ordem de preferência
+        // Lista de modelos para tentar
         const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"];
+        let lastError = "";
         
         for (const modelName of models) {
             try {
                 console.log(`Agenda IA: Tentando modelo ${modelName}...`);
-                // Usando v1beta que é o mais compatível com modelos flash
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
                 
                 const res = await fetch(url, {
@@ -88,25 +88,45 @@ document.addEventListener("DOMContentLoaded", function () {
                     body: body
                 });
 
+                const data = await res.json();
+
                 if (res.ok) {
-                    const data = await res.json();
                     return processResponse(data);
                 } else {
-                    const errData = await res.json();
-                    console.warn(`Agenda IA: Modelo ${modelName} falhou:`, errData);
-                    // Se for erro de chave (400/403), não adianta tentar outros modelos
-                    if (res.status === 400 || res.status === 403) {
-                        alert("Erro de Autenticação: Verifique se sua chave API está correta e se o faturamento está ativo.");
-                        return null;
+                    lastError = data.error?.message || "Erro desconhecido";
+                    console.warn(`Agenda IA: Modelo ${modelName} falhou:`, lastError);
+                    
+                    // Se for erro de API Key inválida, paramos na hora
+                    if (lastError.includes("API key not valid") || res.status === 403) {
+                        break;
                     }
                 }
             } catch (err) {
+                lastError = err.message;
                 console.error(`Agenda IA: Erro ao tentar ${modelName}:`, err);
             }
         }
 
-        alert("Erro na API Gemini: Nenhum modelo disponível respondeu. Verifique sua chave API no Google AI Studio.");
+        alert("Erro na API Gemini: " + lastError + "\n\nVerifique se sua chave está correta no menu 'Configurações IA' e se a 'Generative Language API' está ativa no Google AI Studio.");
         return null;
+    }
+
+    /* Função para testar conexão na página de config */
+    const testBtn = document.getElementById("ag-test-key");
+    if (testBtn) {
+        testBtn.addEventListener("click", async function() {
+            testBtn.disabled = true;
+            const original = testBtn.innerHTML;
+            testBtn.innerHTML = "Testando...";
+            
+            const res = await extrairComIA("Teste de conexão");
+            if (res) {
+                alert("✅ Conexão bem sucedida! A IA está funcionando corretamente.");
+            }
+            
+            testBtn.disabled = false;
+            testBtn.innerHTML = original;
+        });
     }
 
     function processResponse(data) {
