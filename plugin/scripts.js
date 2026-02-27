@@ -75,8 +75,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
 
-        // Usando gemini-1.5-flash que é mais estável para produção
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+        // Usando o endpoint v1 estável e o modelo gemini-1.5-flash
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`;
 
         try {
             console.log("Agenda IA: Iniciando análise...");
@@ -89,25 +89,44 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!res.ok) {
                 const errData = await res.json();
                 console.error("Agenda IA: Erro na API Gemini:", errData);
+                
+                // Se o modelo 1.5-flash falhar, tentamos o gemini-pro como fallback automático
+                if (res.status === 404) {
+                    console.log("Agenda IA: Modelo flash não encontrado, tentando gemini-pro...");
+                    const fallbackUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${key}`;
+                    const fallbackRes = await fetch(fallbackUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: body
+                    });
+                    
+                    if (fallbackRes.ok) {
+                        const fallbackData = await fallbackRes.json();
+                        return processResponse(fallbackData);
+                    }
+                }
+
                 alert("Erro na API Gemini: " + (errData.error?.message || "Verifique sua chave API."));
                 return null;
             }
 
             const data = await res.json();
-            let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-            
-            // Limpeza de markdown se houver
-            text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-            
-            console.log("Agenda IA: Resposta bruta:", text);
-            const parsed = JSON.parse(text);
-            console.log("Agenda IA: Dados extraídos:", parsed);
-            return parsed;
+            return processResponse(data);
         } catch (err) {
             console.error("Agenda IA: Erro na requisição:", err);
             alert("Erro ao conectar com a IA. Verifique o console do navegador.");
             return null;
         }
+    }
+
+    function processResponse(data) {
+        let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+        // Limpeza de markdown se houver
+        text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+        console.log("Agenda IA: Resposta bruta:", text);
+        const parsed = JSON.parse(text);
+        console.log("Agenda IA: Dados extraídos:", parsed);
+        return parsed;
     }
 
     /* Intercepta o submit para análise inteligente */

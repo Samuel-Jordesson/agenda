@@ -269,7 +269,7 @@ add_action('wp_ajax_agenda_delete_jogo', function() {
 =================================*/
 add_action('admin_enqueue_scripts', function($hook) {
     if (strpos($hook, 'agenda') === false) return;
-    wp_enqueue_script('agenda-js', plugin_dir_url(__FILE__) . 'scripts.js', [], '4.6', true);
+    wp_enqueue_script('agenda-js', plugin_dir_url(__FILE__) . 'scripts.js', [], '4.7', true);
     wp_localize_script('agenda-js', 'agendaAI', [
         'ajax_url' => admin_url('admin-ajax.php'),
         'tem_chave' => !empty(get_option('agenda_gemini_key')),
