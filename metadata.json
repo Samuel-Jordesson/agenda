@@ -1,0 +1,5 @@
+{
+  "name": "Smart Event Planner",
+  "description": "An intelligent event organizer that uses AI to extract event details from natural language input.",
+  "requestFramePermissions": []
+}
