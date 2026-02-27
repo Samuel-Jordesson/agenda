@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const hoje = new Date().toLocaleDateString('pt-BR');
         const diaSemana = new Date().toLocaleDateString('pt-BR', { weekday: 'long' });
 
-        const prompt = `Você é um extrator de dados de eventos. Extraia os dados deste texto: "${texto}".
+        const prompt = `Você é um extrator de dados de eventos esportivos. Extraia os dados deste texto: "${texto}".
         Hoje é ${diaSemana}, ${hoje}.
         Retorne APENAS um JSON puro (sem markdown, sem blocos de código) com estes campos:
         {
@@ -69,64 +69,66 @@ document.addEventListener("DOMContentLoaded", function () {
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
                 temperature: 0.1,
-                topP: 1,
-                topK: 1,
-                maxOutputTokens: 200,
+                maxOutputTokens: 300,
             }
         });
 
-        // Usando o endpoint v1 estável e o modelo gemini-1.5-flash
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`;
-
-        try {
-            console.log("Agenda IA: Iniciando análise...");
-            const res = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: body
-            });
-
-            if (!res.ok) {
-                const errData = await res.json();
-                console.error("Agenda IA: Erro na API Gemini:", errData);
+        // Lista de modelos para tentar em ordem de preferência
+        const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"];
+        
+        for (const modelName of models) {
+            try {
+                console.log(`Agenda IA: Tentando modelo ${modelName}...`);
+                // Usando v1beta que é o mais compatível com modelos flash
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
                 
-                // Se o modelo 1.5-flash falhar, tentamos o gemini-pro como fallback automático
-                if (res.status === 404) {
-                    console.log("Agenda IA: Modelo flash não encontrado, tentando gemini-pro...");
-                    const fallbackUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${key}`;
-                    const fallbackRes = await fetch(fallbackUrl, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: body
-                    });
-                    
-                    if (fallbackRes.ok) {
-                        const fallbackData = await fallbackRes.json();
-                        return processResponse(fallbackData);
+                const res = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: body
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    return processResponse(data);
+                } else {
+                    const errData = await res.json();
+                    console.warn(`Agenda IA: Modelo ${modelName} falhou:`, errData);
+                    // Se for erro de chave (400/403), não adianta tentar outros modelos
+                    if (res.status === 400 || res.status === 403) {
+                        alert("Erro de Autenticação: Verifique se sua chave API está correta e se o faturamento está ativo.");
+                        return null;
                     }
                 }
-
-                alert("Erro na API Gemini: " + (errData.error?.message || "Verifique sua chave API."));
-                return null;
+            } catch (err) {
+                console.error(`Agenda IA: Erro ao tentar ${modelName}:`, err);
             }
-
-            const data = await res.json();
-            return processResponse(data);
-        } catch (err) {
-            console.error("Agenda IA: Erro na requisição:", err);
-            alert("Erro ao conectar com a IA. Verifique o console do navegador.");
-            return null;
         }
+
+        alert("Erro na API Gemini: Nenhum modelo disponível respondeu. Verifique sua chave API no Google AI Studio.");
+        return null;
     }
 
     function processResponse(data) {
         let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-        // Limpeza de markdown se houver
+        // Limpeza agressiva de markdown/lixo
         text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-        console.log("Agenda IA: Resposta bruta:", text);
-        const parsed = JSON.parse(text);
-        console.log("Agenda IA: Dados extraídos:", parsed);
-        return parsed;
+        // Tenta encontrar o primeiro { e o último } caso a IA mande texto extra
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        if (start !== -1 && end !== -1) {
+            text = text.substring(start, end + 1);
+        }
+        
+        console.log("Agenda IA: Resposta processada:", text);
+        try {
+            const parsed = JSON.parse(text);
+            console.log("Agenda IA: Dados extraídos com sucesso:", parsed);
+            return parsed;
+        } catch (e) {
+            console.error("Agenda IA: Falha ao parsear JSON:", text);
+            return null;
+        }
     }
 
     /* Intercepta o submit para análise inteligente */
