@@ -64,7 +64,8 @@ function agenda_config_page() {
     if (isset($_POST['agenda_config_nonce']) && wp_verify_nonce($_POST['agenda_config_nonce'], 'agenda_config_save')) {
         update_option('agenda_gemini_key', sanitize_text_field($_POST['gemini_key'] ?? ''));
     }
-    $key = esc_attr(get_option('agenda_gemini_key', ''));
+    $key = get_option('agenda_gemini_key', '');
+    $key_masked = $key ? substr($key, 0, 8) . '...' . substr($key, -4) : '';
     ?>
     <div class="agenda-wrap">
         <div class="ag-header">
@@ -81,12 +82,28 @@ function agenda_config_page() {
                 <?php wp_nonce_field('agenda_config_save', 'agenda_config_nonce'); ?>
                 <div class="ag-field">
                     <label class="ag-label">Chave API Gemini</label>
-                    <input class="ag-input" type="password" name="gemini_key" value="<?php echo $key; ?>" placeholder="AIzaSy...">
+                    <input class="ag-input" type="text" name="gemini_key" value="<?php echo esc_attr($key); ?>" placeholder="AIzaSy...">
+                    <p style="font-size: 12px; color: var(--cmut); margin-top: 10px;">
+                        <strong>Como obter:</strong><br>
+                        1. Acesse o <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.<br>
+                        2. Crie uma chave de API gratuita.<br>
+                        3. Certifique-se de que a <strong>Generative Language API</strong> está ativada no seu projeto.
+                    </p>
                 </div>
                 <div class="ag-form-footer">
-                    <button type="submit" class="ag-btn"><?php echo ag_ico('save'); ?> Salvar</button>
+                    <button type="submit" class="ag-btn"><?php echo ag_ico('save'); ?> Salvar Chave</button>
                 </div>
             </form>
+        </div>
+
+        <div class="ag-card" style="margin-top: 20px; padding: 20px;">
+            <h3 style="margin-top: 0;">Status da Conexão</h3>
+            <?php if ($key): ?>
+                <p style="color: #166534; font-weight: 600;">✅ Chave configurada (<?php echo $key_masked; ?>)</p>
+                <p style="font-size: 13px;">Se a IA não estiver preenchendo os campos, verifique se a chave é válida e se você tem saldo/limite no Google AI Studio.</p>
+            <?php else: ?>
+                <p style="color: #991b1b; font-weight: 600;">❌ Chave não configurada</p>
+            <?php endif; ?>
         </div>
     </div>
     <?php
@@ -252,7 +269,7 @@ add_action('wp_ajax_agenda_delete_jogo', function() {
 =================================*/
 add_action('admin_enqueue_scripts', function($hook) {
     if (strpos($hook, 'agenda') === false) return;
-    wp_enqueue_script('agenda-js', plugin_dir_url(__FILE__) . 'scripts.js', [], '4.5', true);
+    wp_enqueue_script('agenda-js', plugin_dir_url(__FILE__) . 'scripts.js', [], '4.6', true);
     wp_localize_script('agenda-js', 'agendaAI', [
         'ajax_url' => admin_url('admin-ajax.php'),
         'tem_chave' => !empty(get_option('agenda_gemini_key')),
